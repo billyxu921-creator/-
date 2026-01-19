@@ -205,7 +205,14 @@ class DailyReportSystem:
         
         # 统计信息
         total_count = len(gold_df)
-        qualified_count = len(gold_df[gold_df['是否符合条件'] == '是'])
+        # 兼容新旧版本的列名
+        if '是否符合条件' in gold_df.columns:
+            qualified_count = len(gold_df[gold_df['是否符合条件'] == '是'])
+        elif '进入筛选池' in gold_df.columns:
+            qualified_count = len(gold_df[gold_df['进入筛选池'] == '是'])
+        else:
+            qualified_count = total_count  # 如果没有这些列，默认全部符合
+        
         avg_score = gold_df['总分'].mean()
         
         lines.append(f"分析股票总数: {total_count} 只")
@@ -220,16 +227,16 @@ class DailyReportSystem:
         top_stocks = gold_df.head(5)
         for idx, row in top_stocks.iterrows():
             lines.append(f"{idx+1}. {row['股票代码']} {row['股票名称']}")
-            lines.append(f"   总分: {row['总分']:.0f} | 股本: {row['总股本(亿股)']}亿股 | "
-                        f"市值: {row['流通市值(亿元)']}亿元 | 价格: {row['当前价格']:.2f}元")
+            lines.append(f"   总分: {row['总分']:.0f} | 股本: {row.get('总股本(亿股)', 'N/A')}亿股 | "
+                        f"市值: {row.get('流通市值(亿元)', 'N/A')}亿元 | 价格: {row.get('当前价格', 0):.2f}元")
             
             # 亮点说明
             highlights = []
-            if row['股本匹配分'] > 0:
+            if row.get('股本匹配分', 0) > 0:
                 highlights.append("股本规模适中")
-            if row['官方背书分'] > 0:
+            if row.get('官方背书分', 0) > 0:
                 highlights.append("有官方资本背景")
-            if row['黄金行业加分'] > 0:
+            if row.get('黄金行业分', 0) > 0 or '黄金' in str(row.get('所属行业', '')):
                 highlights.append("黄金行业")
             
             if highlights:
@@ -326,7 +333,14 @@ class DailyReportSystem:
         # 基于黄金股票的建议
         if '黄金股票' in self.report_data and not self.report_data['黄金股票'].empty:
             gold_df = self.report_data['黄金股票']
-            qualified_stocks = gold_df[gold_df['是否符合条件'] == '是']
+            
+            # 兼容新旧版本的列名
+            if '是否符合条件' in gold_df.columns:
+                qualified_stocks = gold_df[gold_df['是否符合条件'] == '是']
+            elif '进入筛选池' in gold_df.columns:
+                qualified_stocks = gold_df[gold_df['进入筛选池'] == '是']
+            else:
+                qualified_stocks = gold_df  # 如果没有这些列，默认全部符合
             
             if not qualified_stocks.empty:
                 lines.append("1. 黄金板块投资建议:")
@@ -336,7 +350,7 @@ class DailyReportSystem:
                 lines.append(f"   - 重点关注: {top_stock['股票代码']} {top_stock['股票名称']} "
                            f"(评分: {top_stock['总分']:.0f})")
                 
-                if qualified_stocks.iloc[0]['官方背书分'] > 0:
+                if top_stock.get('官方背书分', 0) > 0:
                     lines.append(f"   - 该股有官方资本背景，相对稳健")
                 
                 lines.append("")
